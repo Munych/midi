@@ -40,12 +40,9 @@ class Midi {
             this.changeOffset(parseInt(chunkLengthTrack, 16));
             
             const midiTrack = new MidiTrack(chunkTypeTrack, chunkLengthTrack, chunkEvents);
-            // midiTrack.print();
 
             this.tracks.push(midiTrack);
         }
-
-        console.log(this);
     }
 
     changeOffset(offset) {
@@ -77,11 +74,57 @@ class MidiHeaderTrack {
 
 class MidiTrack {
     constructor(chunkType, chunkLength, chunkEvents) {
+        this.offset = 0;
+
         this.chunkType = Utils.hexToAscii(chunkType);
         this.chunkLength = parseInt(chunkLength, 16);
-        this.chunkEvents = chunkEvents;
+        this.chunkEvents = this.parseEvents(chunkEvents);
+        this.print();
+    }
 
-        // this.print();
+    parseEvents(chunkEvents) {
+        const events = [];
+
+        while(Utils.getBytes(this.offset, 1, chunkEvents)) {
+            const deltaTime = Utils.getBytes(this.offset, 1, chunkEvents);
+            this.changeOffset(1);
+            const type = Utils.getBytes(this.offset, 1, chunkEvents);
+            this.changeOffset(1);
+    
+            switch(type) {
+                case 'ff': {
+                    const code = Utils.getBytes(this.offset, 1, chunkEvents);
+                    this.changeOffset(1);
+    
+                    if(code && code === '51') {
+                        const nextCode = Utils.getBytes(this.offset, 1, chunkEvents);
+                        this.changeOffset(1);
+
+                        const tempo = Utils.getBytes(this.offset, 3, chunkEvents);
+                        this.changeOffset(3);
+
+                        const event = {
+                            deltaTime,
+                            type,
+                            code,
+                            nextCode,
+                            tempo,
+                            description: 'Set Tempo'
+                        }
+
+                        events.push(event);
+                    }
+                    
+                    break;
+                }
+            }
+        }
+
+        return events;
+    }
+
+    changeOffset(offset) {
+        this.offset += offset * 2;
     }
 
     print() {
@@ -90,5 +133,11 @@ class MidiTrack {
         console.log('chunkEvents', this.chunkEvents);
     }
 }
+
+// class MidiEvent {
+//     constructor() {
+
+//     }
+// }
 
 module.exports = Midi;
